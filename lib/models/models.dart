@@ -24,6 +24,8 @@ class Profile {
     required this.bestWpm,
     required this.pinHash,
     required this.language,
+    required this.pointsThreshold,
+    required this.recordBonus,
   });
 
   final String childName;
@@ -32,6 +34,15 @@ class Profile {
   final int bestWpm; // Rekord: Wörter pro Minute
   final String? pinHash; // SHA-256 der Eltern-PIN
   final ReadingLanguage language;
+  final int pointsThreshold; // ab so vielen Wörtern/Minute gibt es Punkte
+  final int recordBonus; // Bonuspunkte bei neuem Rekord
+
+  /// Punkte-Regel: ab der Schwelle 1 Punkt, danach +1 pro weiterem Wort
+  /// (Schwelle 100: 100 → 1, 106 → 7). Neuer Rekord: + Bonus.
+  int pointsFor(int words, {required bool isRecord}) {
+    final base = words >= pointsThreshold ? words - pointsThreshold + 1 : 0;
+    return base + (isRecord ? recordBonus : 0);
+  }
 
   int get pointsAvailable => pointsTotal - pointsSpent;
 
@@ -44,6 +55,8 @@ class Profile {
       bestWpm: (d['bestWpm'] as num?)?.toInt() ?? 0,
       pinHash: d['pinHash'] as String?,
       language: ReadingLanguage.fromCode(d['language'] as String?),
+      pointsThreshold: (d['pointsThreshold'] as num?)?.toInt() ?? 100,
+      recordBonus: (d['recordBonus'] as num?)?.toInt() ?? 20,
     );
   }
 }
@@ -145,6 +158,7 @@ class SessionResult {
     required this.isNewRecord,
     required this.previousBest,
     required this.newlyUnlocked,
+    required this.pointsThreshold,
   });
 
   final int words;
@@ -152,4 +166,5 @@ class SessionResult {
   final bool isNewRecord;
   final int previousBest;
   final List<Reward> newlyUnlocked;
+  final int pointsThreshold;
 }

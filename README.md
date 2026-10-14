@@ -1,4 +1,4 @@
-# Lese-Trainer 📖
+# Kasem Lese App 📖🦎
 
 Flutter-App für Android: Das Kind liest 1 Minute laut vor, die App zählt die
 Wörter per Spracherkennung (Deutsch oder Arabisch), speichert jede Runde in
@@ -9,7 +9,7 @@ Firebase und schaltet Geschenke frei.
 - **1-Minuten-Lesen** mit Countdown 3-2-1, großem Live-Wortzähler und Timer
 - **Spracherkennung** Deutsch 🇩🇪 und Arabisch (RTL-Anzeige), startet nach Lesepausen automatisch neu
 - **Firebase-Speicherung**: jede Runde als Record (`words`, `points`, `language`, `isRecord`, `createdAt`)
-- **Punkte**: 1 Punkt pro Wort, +20 Bonus bei neuem Rekord
+- **Punkte**: ab einer Schwelle (Standard 100 Wörter/Min) 1 Punkt, jedes weitere Wort +1 (100 → 1, 106 → 7). Neuer Rekord: Bonus (Standard 20). Beides im Elternbereich einstellbar
 - **Zwei Geschenk-Arten** (von den Eltern festgelegt):
   - ⭐ *Punkte-Geschenk* – kostet Punkte, die beim Übergeben abgezogen werden
   - 🏆 *Rekord-Geschenk* – einmalig, sobald X Wörter in 1 Minute erreicht sind

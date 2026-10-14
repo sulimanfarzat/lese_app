@@ -1,7 +1,7 @@
 name: lese_app
-description: Lese-Trainer für Kinder – zählt gelesene Wörter pro Minute, speichert in Firebase und schaltet Belohnungen frei.
+description: Kasem Lese App – zählt gelesene Wörter pro Minute, speichert in Firebase und schaltet Belohnungen frei.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -14,11 +14,23 @@ dependencies:
   cloud_firestore: ^5.4.4
   speech_to_text: ^7.0.0
   crypto: ^3.0.5
+  wakelock_plus: ^1.2.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/kasem.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/icon.png
+  adaptive_icon_background: "#FFD23F"
+  adaptive_icon_foreground: assets/icon_foreground.png
+  min_sdk_android: 23

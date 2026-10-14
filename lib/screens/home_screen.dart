@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../theme.dart';
 import 'parent_area_screen.dart';
 import 'reading_screen.dart';
 import 'rewards_screen.dart';
@@ -21,12 +22,12 @@ class HomeScreen extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final p = snap.data!;
-        final name = p.childName.isEmpty ? 'Lese-Held' : p.childName;
-        final scheme = Theme.of(context).colorScheme;
+        final name = p.childName.isEmpty ? 'Kasem' : p.childName;
+        final toFirstPoint = p.pointsThreshold;
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Lese-Trainer'),
+            title: const Text('Kasem Lese App'),
             actions: [
               IconButton(
                 tooltip: 'Elternbereich',
@@ -37,11 +38,22 @@ class HomeScreen extends StatelessWidget {
           ),
           body: SafeArea(
             child: ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
-                Text('Hallo $name! 👋',
-                    style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 20),
+                // Echse mit Sprechblase
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Image.asset('assets/kasem.png', height: 170),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _SpeechBubble(
+                        text: 'Hallo $name! 👋\nLust zu lesen?',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
@@ -49,7 +61,7 @@ class HomeScreen extends StatelessWidget {
                         icon: '⭐',
                         value: '${p.pointsAvailable}',
                         label: 'Punkte',
-                        color: scheme.primaryContainer,
+                        color: KasemColors.yellow,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -57,15 +69,21 @@ class HomeScreen extends StatelessWidget {
                       child: _StatCard(
                         icon: '🏆',
                         value: '${p.bestWpm}',
-                        label: 'Rekord (Wörter/Min)',
-                        color: scheme.tertiaryContainer,
+                        label: 'Rekord\nWörter/Min',
+                        color: KasemColors.sky,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                Text('In welcher Sprache liest du?',
-                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  'Punkte gibt es ab $toFirstPoint Wörtern in einer Minute!',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 20),
+                const Text('In welcher Sprache liest du?',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 SegmentedButton<ReadingLanguage>(
                   segments: [
@@ -75,13 +93,13 @@ class HomeScreen extends StatelessWidget {
                   selected: {p.language},
                   onSelectionChanged: (s) => service.setLanguage(s.first),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 SizedBox(
                   height: 120,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28)),
+                      backgroundColor: KasemColors.green,
+                      elevation: 4,
                     ),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(
@@ -95,27 +113,50 @@ class HomeScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text('📖', style: TextStyle(fontSize: 40)),
-                        Text('Lesen starten (1 Minute)',
-                            style: TextStyle(fontSize: 22)),
+                        Text('Lesen starten!',
+                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  icon: const Text('🎁', style: TextStyle(fontSize: 22)),
-                  label: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Text('Meine Geschenke', style: TextStyle(fontSize: 18)),
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: 64,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: KasemColors.pink),
+                    icon: const Text('🎁', style: TextStyle(fontSize: 26)),
+                    label: const Text('Meine Geschenke',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => RewardsScreen(service: service))),
                   ),
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => RewardsScreen(service: service))),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _SpeechBubble extends StatelessWidget {
+  const _SpeechBubble({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: KasemColors.green, width: 3),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.3),
+      ),
     );
   }
 }
@@ -138,16 +179,16 @@ class _StatCard extends StatelessWidget {
     return Card(
       color: color,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 32)),
+            Text(icon, style: const TextStyle(fontSize: 30)),
             Text(value,
-                style: Theme.of(context)
-                    .textTheme
-                    .displaySmall
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            Text(label, textAlign: TextAlign.center),
+                style: const TextStyle(
+                    fontSize: 40, fontWeight: FontWeight.w900, color: KasemColors.ink)),
+            Text(label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w700, color: KasemColors.ink)),
           ],
         ),
       ),

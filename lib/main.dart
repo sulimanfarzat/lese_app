@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart'; // wird von `flutterfire configure` erzeugt
 import 'screens/home_screen.dart';
 import 'services/firestore_service.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,12 +19,9 @@ class LeseApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Lese-Trainer',
+      title: 'Kasem Lese App',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.orange,
-        useMaterial3: true,
-      ),
+      theme: kasemTheme(),
       home: const AuthGate(),
     );
   }

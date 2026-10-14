@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/models.dart';
 import '../services/firestore_service.dart';
@@ -34,6 +35,8 @@ class _ReadingScreenState extends State<ReadingScreen> {
   void initState() {
     super.initState();
     _counter.addListener(_onCounterChanged);
+    // Bildschirm bleibt an, solange dieser Bildschirm offen ist.
+    WakelockPlus.enable();
     _prepare();
   }
 
@@ -111,6 +114,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    WakelockPlus.disable();
     _counter.removeListener(_onCounterChanged);
     _counter.dispose();
     super.dispose();

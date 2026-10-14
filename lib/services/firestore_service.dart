@@ -23,11 +23,6 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _rewards =>
       _userRef.collection('rewards');
 
-  /// Punkte-Regel: 1 Punkt pro gelesenem Wort, +20 Bonus bei neuem Rekord.
-  static const int recordBonus = 20;
-  static int pointsFor(int words, bool isRecord) =>
-      words + (isRecord ? recordBonus : 0);
-
   // ---------------------------------------------------------------- Profil
 
   Future<void> ensureProfile() async {
@@ -40,6 +35,8 @@ class FirestoreService {
         'bestWpm': 0,
         'pinHash': null,
         'language': ReadingLanguage.german.code,
+        'pointsThreshold': 100,
+        'recordBonus': 20,
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
@@ -53,6 +50,9 @@ class FirestoreService {
 
   Future<void> setLanguage(ReadingLanguage lang) =>
       _userRef.update({'language': lang.code});
+
+  Future<void> setPointRules({required int threshold, required int bonus}) =>
+      _userRef.update({'pointsThreshold': threshold, 'recordBonus': bonus});
 
   // ------------------------------------------------------------- Eltern-PIN
 
@@ -82,13 +82,15 @@ class FirestoreService {
     late bool isRecord;
     late int points;
     late int previousBest;
+    late int threshold;
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(_userRef);
       final p = Profile.fromDoc(snap);
       previousBest = p.bestWpm;
       isRecord = words > p.bestWpm && words > 0;
-      points = pointsFor(words, isRecord);
+      threshold = p.pointsThreshold;
+      points = p.pointsFor(words, isRecord: isRecord);
 
       tx.set(_sessions.doc(), {
         'words': words,
@@ -116,6 +118,7 @@ class FirestoreService {
       isNewRecord: isRecord,
       previousBest: previousBest,
       newlyUnlocked: newlyUnlocked,
+      pointsThreshold: threshold,
     );
   }
 

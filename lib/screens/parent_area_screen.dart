@@ -199,9 +199,10 @@ class _RewardsTab extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Punkte-Regel: 1 Punkt pro Wort, +${FirestoreService.recordBonus} '
-                'Bonus bei neuem Rekord.',
+              Text(
+                'Punkte-Regel: ab ${profile.pointsThreshold} Wörtern 1 Punkt, '
+                'jedes weitere Wort +1. Neuer Rekord: +${profile.recordBonus}. '
+                '(Ändern unter „Einstellungen“)',
               ),
               const SizedBox(height: 12),
               if (rewards.isEmpty)
@@ -411,6 +412,10 @@ class _SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<_SettingsTab> {
   late final _name = TextEditingController(text: widget.profile.childName);
+  late final _threshold =
+      TextEditingController(text: '${widget.profile.pointsThreshold}');
+  late final _bonus =
+      TextEditingController(text: '${widget.profile.recordBonus}');
 
   @override
   Widget build(BuildContext context) {
@@ -433,6 +438,48 @@ class _SettingsTabState extends State<_SettingsTab> {
               if (context.mounted) {
                 ScaffoldMessenger.of(context)
                     .showSnackBar(const SnackBar(content: Text('Gespeichert')));
+              }
+            },
+            child: const Text('Speichern'),
+          ),
+        ),
+        const Divider(height: 32),
+        Text('⭐ Punkte-Regel',
+            style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _threshold,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+            labelText: 'Punkte ab … Wörtern pro Minute',
+            helperText: 'Beispiel 100: 100 Wörter → 1 Punkt, 106 Wörter → 7 Punkte',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _bonus,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+            labelText: 'Bonuspunkte bei neuem Rekord',
+            helperText: '0 = kein Bonus',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton(
+            onPressed: () async {
+              final t = int.tryParse(_threshold.text) ?? 0;
+              final b = int.tryParse(_bonus.text) ?? 0;
+              if (t < 1) return;
+              await widget.service.setPointRules(threshold: t, bonus: b);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Punkte-Regel gespeichert')));
               }
             },
             child: const Text('Speichern'),
