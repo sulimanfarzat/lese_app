@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1036779789848",
+    "project_id": "kasem-app",
+    "storage_bucket": "kasem-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1036779789848:android:fb57aa86ff17b262742d6d",
+        "android_client_info": {
+          "package_name": "com.farzat.kasemapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlLLTZ9LGvKlGPvtDCwWCkGrPLEX0S_RM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
