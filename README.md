@@ -61,13 +61,17 @@ flutter build apk    # fertige APK unter build/app/outputs/flutter-apk/
   Für Offline-Nutzung zusätzlich das Offline-Sprachpaket laden.
 - Beim ersten Öffnen des Elternbereichs (🔒 oben rechts) wird die PIN festgelegt.
 
-## Datenstruktur in Firestore
+## Datenstruktur in Firestore (zentral, für mehrere Handys)
+
+Alle Handys einer Familie teilen sich die Daten über den **Familien-Code**
+(z. B. `K7M-Q4P`, zu finden im Elternbereich → Familie).
 
 ```
-users/{uid}
-  childName, pointsTotal, pointsSpent, bestWpm, pinHash, language
-  sessions/{id}   words, points, language, isRecord, durationSeconds, createdAt
-  rewards/{id}    title, emoji, type (points|record), threshold, redeemed, redeemedAt
+devices/{uid}                         familyCode   (welches Handy gehört zu welcher Familie)
+families/{code}                       pinHash, pointsThreshold, recordBonus, members[]
+  children/{childId}                  name, emoji, pointsTotal, pointsSpent, bestWpm, language, redeemed{}
+    sessions/{id}                     words, points, language, isRecord, device, createdAt
+  rewards/{id}                        title, emoji, type (points|record), threshold
 ```
 
 ## Hinweise

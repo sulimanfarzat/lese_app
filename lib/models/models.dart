@@ -15,27 +15,24 @@ enum ReadingLanguage {
           orElse: () => ReadingLanguage.german);
 }
 
-/// Profil des Kindes (ein Dokument pro Gerät/Konto).
-class Profile {
-  Profile({
-    required this.childName,
-    required this.pointsTotal,
-    required this.pointsSpent,
-    required this.bestWpm,
+int _int(Object? v, [int fallback = 0]) => (v as num?)?.toInt() ?? fallback;
+
+/// Familie – wird über den Familien-Code von mehreren Handys geteilt.
+class Family {
+  Family({
+    required this.code,
     required this.pinHash,
-    required this.language,
     required this.pointsThreshold,
     required this.recordBonus,
   });
 
-  final String childName;
-  final int pointsTotal; // alle jemals gesammelten Punkte
-  final int pointsSpent; // für Geschenke eingelöste Punkte
-  final int bestWpm; // Rekord: Wörter pro Minute
-  final String? pinHash; // SHA-256 der Eltern-PIN
-  final ReadingLanguage language;
+  final String code; // Dokument-ID, z. B. "K7MQ4P" (angezeigt als K7M-Q4P)
+  final String? pinHash;
   final int pointsThreshold; // ab so vielen Wörtern/Minute gibt es Punkte
   final int recordBonus; // Bonuspunkte bei neuem Rekord
+
+  String get displayCode =>
+      code.length == 6 ? '${code.substring(0, 3)}-${code.substring(3)}' : code;
 
   /// Punkte-Regel: ab der Schwelle 1 Punkt, danach +1 pro weiterem Wort
   /// (Schwelle 100: 100 → 1, 106 → 7). Neuer Rekord: + Bonus.
@@ -44,19 +41,58 @@ class Profile {
     return base + (isRecord ? recordBonus : 0);
   }
 
+  factory Family.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final d = doc.data() ?? {};
+    return Family(
+      code: doc.id,
+      pinHash: d['pinHash'] as String?,
+      pointsThreshold: _int(d['pointsThreshold'], 100),
+      recordBonus: _int(d['recordBonus'], 20),
+    );
+  }
+}
+
+/// Ein Kind in der Familie mit eigenen Punkten und Rekorden.
+class Child {
+  Child({
+    required this.id,
+    required this.name,
+    required this.emoji,
+    required this.pointsTotal,
+    required this.pointsSpent,
+    required this.bestWpm,
+    required this.language,
+    required this.redeemed,
+  });
+
+  final String id;
+  final String name;
+  final String emoji;
+  final int pointsTotal; // alle jemals gesammelten Punkte
+  final int pointsSpent; // für Geschenke eingelöste Punkte
+  final int bestWpm; // Rekord: Wörter pro Minute
+  final ReadingLanguage language;
+  final Map<String, DateTime> redeemed; // Geschenk-ID → wann übergeben
+
   int get pointsAvailable => pointsTotal - pointsSpent;
 
-  factory Profile.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory Child.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
-    return Profile(
-      childName: (d['childName'] as String?) ?? '',
-      pointsTotal: (d['pointsTotal'] as num?)?.toInt() ?? 0,
-      pointsSpent: (d['pointsSpent'] as num?)?.toInt() ?? 0,
-      bestWpm: (d['bestWpm'] as num?)?.toInt() ?? 0,
-      pinHash: d['pinHash'] as String?,
+    final r = (d['redeemed'] as Map<String, dynamic>?) ?? {};
+    return Child(
+      id: doc.id,
+      name: (d['name'] as String?) ?? 'Kind',
+      emoji: (d['emoji'] as String?) ?? '🦎',
+      pointsTotal: _int(d['pointsTotal']),
+      pointsSpent: _int(d['pointsSpent']),
+      bestWpm: _int(d['bestWpm']),
       language: ReadingLanguage.fromCode(d['language'] as String?),
-      pointsThreshold: (d['pointsThreshold'] as num?)?.toInt() ?? 100,
-      recordBonus: (d['recordBonus'] as num?)?.toInt() ?? 20,
+      redeemed: {
+        for (final e in r.entries)
+          e.key: (e.value is Timestamp)
+              ? (e.value as Timestamp).toDate()
+              : DateTime.now(),
+      },
     );
   }
 }
@@ -83,8 +119,8 @@ class ReadingSession {
     final d = doc.data();
     return ReadingSession(
       id: doc.id,
-      words: (d['words'] as num?)?.toInt() ?? 0,
-      points: (d['points'] as num?)?.toInt() ?? 0,
+      words: _int(d['words']),
+      points: _int(d['points']),
       language: ReadingLanguage.fromCode(d['language'] as String?),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRecord: (d['isRecord'] as bool?) ?? false,
@@ -97,6 +133,8 @@ class ReadingSession {
 /// - [record]: wird freigeschaltet, wenn ein Wörter-pro-Minute-Ziel erreicht ist
 enum RewardType { points, record }
 
+/// Geschenk aus der gemeinsamen Familien-Liste.
+/// Ob es freigeschaltet / übergeben ist, gilt jeweils pro Kind.
 class Reward {
   Reward({
     required this.id,
@@ -104,8 +142,6 @@ class Reward {
     required this.emoji,
     required this.type,
     required this.threshold,
-    required this.redeemed,
-    this.redeemedAt,
   });
 
   final String id;
@@ -113,22 +149,22 @@ class Reward {
   final String emoji;
   final RewardType type;
   final int threshold; // Punkte-Preis oder Wörter/Minute-Ziel
-  final bool redeemed;
-  final DateTime? redeemedAt;
 
-  /// Darf das Kind dieses Geschenk gerade bekommen?
-  bool isUnlocked(Profile p) {
-    if (redeemed) return false;
+  bool isRedeemedBy(Child c) => c.redeemed.containsKey(id);
+
+  /// Darf dieses Kind das Geschenk gerade bekommen?
+  bool isUnlockedFor(Child c) {
+    if (isRedeemedBy(c)) return false;
     return switch (type) {
-      RewardType.points => p.pointsAvailable >= threshold,
-      RewardType.record => p.bestWpm >= threshold,
+      RewardType.points => c.pointsAvailable >= threshold,
+      RewardType.record => c.bestWpm >= threshold,
     };
   }
 
   /// Fortschritt 0.0 – 1.0 für die Anzeige.
-  double progress(Profile p) {
+  double progress(Child c) {
     if (threshold <= 0) return 1;
-    final current = type == RewardType.points ? p.pointsAvailable : p.bestWpm;
+    final current = type == RewardType.points ? c.pointsAvailable : c.bestWpm;
     return (current / threshold).clamp(0, 1).toDouble();
   }
 
@@ -143,9 +179,7 @@ class Reward {
       title: (d['title'] as String?) ?? 'Geschenk',
       emoji: (d['emoji'] as String?) ?? '🎁',
       type: (d['type'] == 'record') ? RewardType.record : RewardType.points,
-      threshold: (d['threshold'] as num?)?.toInt() ?? 0,
-      redeemed: (d['redeemed'] as bool?) ?? false,
-      redeemedAt: (d['redeemedAt'] as Timestamp?)?.toDate(),
+      threshold: _int(d['threshold']),
     );
   }
 }

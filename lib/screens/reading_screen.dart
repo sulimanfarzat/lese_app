@@ -10,9 +10,15 @@ import 'result_screen.dart';
 
 /// Ablauf: Vorbereitung → Countdown 3-2-1 → 60 Sekunden lesen → speichern.
 class ReadingScreen extends StatefulWidget {
-  const ReadingScreen({super.key, required this.service, required this.language});
+  const ReadingScreen({
+    super.key,
+    required this.service,
+    required this.childId,
+    required this.language,
+  });
 
-  final FirestoreService service;
+  final FamilyService service;
+  final String childId;
   final ReadingLanguage language;
 
   @override
@@ -90,8 +96,8 @@ class _ReadingScreenState extends State<ReadingScreen> {
     await Future.delayed(const Duration(milliseconds: 600));
     final words = await _counter.stop();
     try {
-      final result = await widget.service
-          .saveSession(words: words, language: widget.language);
+      final result = await widget.service.saveSession(
+          childId: widget.childId, words: words, language: widget.language);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => ResultScreen(result: result),
