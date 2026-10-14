@@ -1,0 +1,63 @@
+name: APK bauen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Android-Gerüst erzeugen
+        run: |
+          flutter create --platforms=android --org io.farzat --project-name lese_app .
+          cp android_setup/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+
+      - name: minSdk + Paketname aus google-services.json setzen
+        run: |
+          PKG=$(python3 -c "import json;print(json.load(open('google-services.json'))['client'][0]['client_info']['android_client_info']['package_name'])")
+          echo "Paketname: $PKG"
+          for f in android/app/build.gradle android/app/build.gradle.kts; do
+            [ -f "$f" ] || continue
+            sed -i -E "s/minSdk(Version)? *=? *flutter\.minSdkVersion/minSdk = 23/" "$f"
+            sed -i -E "s/applicationId *=? *\"[^\"]+\"/applicationId = \"$PKG\"/" "$f"
+            grep -nE "minSdk|applicationId" "$f"
+          done
+          cp google-services.json android/app/google-services.json
+
+      - run: flutter pub get
+
+      - run: flutter build apk --release
+
+      - name: APK umbenennen
+        run: cp build/app/outputs/flutter-apk/app-release.apk lese-trainer.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lese-trainer-apk
+          path: lese-trainer.apk
+
+      - name: Als Release veröffentlichen (Download-Link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Lese-Trainer Build ${{ github.run_number }}
+          files: lese-trainer.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+permissions:
+  contents: write

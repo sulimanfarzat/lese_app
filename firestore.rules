@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Jedes Gerät (anonymer Login) sieht und ändert nur seine eigenen Daten.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /sessions/{sessionId} {
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        // Plausibilitätsprüfung: max. 300 Wörter in einer Minute.
+        allow create: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.words is int
+          && request.resource.data.words >= 0
+          && request.resource.data.words <= 300;
+      }
+
+      match /rewards/{rewardId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+}
