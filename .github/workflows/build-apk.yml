@@ -40,22 +40,36 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build apk --release
+      - name: Kleine APKs pro Prozessor-Typ bauen
+        run: |
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk lese-trainer-arm64.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk lese-trainer-alt-32bit.apk
 
-      - name: APK umbenennen
-        run: cp build/app/outputs/flutter-apk/app-release.apk lese-trainer.apk
+      - name: Universal-APK bauen (läuft auf allen Geräten)
+        run: |
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk lese-trainer.apk
+          ls -lh *.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: lese-trainer-apk
-          path: lese-trainer.apk
+          path: '*.apk'
 
       - name: Als Release veröffentlichen (Download-Link)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: Lese-Trainer Build ${{ github.run_number }}
-          files: lese-trainer.apk
+          body: |
+            - **lese-trainer-arm64.apk** – empfohlen, klein, für fast alle Handys ab ca. 2017
+            - **lese-trainer.apk** – universell, falls die kleine nicht installiert werden kann
+            - **lese-trainer-alt-32bit.apk** – nur für sehr alte Handys
+          files: |
+            lese-trainer-arm64.apk
+            lese-trainer.apk
+            lese-trainer-alt-32bit.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
