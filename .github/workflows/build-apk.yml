@@ -27,7 +27,7 @@ jobs:
       - name: Android-Gerüst erzeugen
         run: |
           flutter create --platforms=android --org io.farzat --project-name lese_app .
-          rm -rf test   # Beispieltest von flutter create passt nicht zur App
+          rm -f test/widget_test.dart   # Beispieltest von flutter create passt nicht zur App
           cp android_setup/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           cp google-services.json android/app/google-services.json
 
@@ -41,6 +41,9 @@ jobs:
 
       - name: Code prüfen
         run: flutter analyze --no-fatal-infos --no-fatal-warnings lib
+
+      - name: Zähl-Logik testen
+        run: flutter test
 
       - name: Kleine APKs pro Prozessor-Typ bauen
         run: |

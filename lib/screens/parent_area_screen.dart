@@ -427,6 +427,56 @@ class _HistoryTab extends StatelessWidget {
   final Kid? selected;
   final ValueChanged<String> onSelect;
 
+  /// Eltern können die gezählten Wörter korrigieren, falls die
+  /// Spracherkennung zu wenig erkannt hat.
+  Future<void> _correctWords(BuildContext context, Kid kid, ReadingSession s) async {
+    final ctrl = TextEditingController(text: '${s.words}');
+    final value = await showDialog<int>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Wortzahl korrigieren'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Gezählt wurden ${s.words} Wörter. Wie viele hat ${kid.name} '
+                'wirklich gelesen?'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                  labelText: 'Wörter in 1 Minute', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 8),
+            const Text('Punkte werden neu berechnet. Ein Rekord wird nie verringert.',
+                style: TextStyle(fontSize: 13)),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: () {
+              final v = int.tryParse(ctrl.text);
+              if (v != null && v >= 0 && v <= 300) Navigator.pop(context, v);
+            },
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+    if (value == null || value == s.words) return;
+    try {
+      await service.correctSessionWords(kid.id, s, value);
+      _snack(context, 'Korrigiert: $value Wörter');
+    } catch (e) {
+      _snack(context, 'Fehler: $e');
+    }
+  }
+
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.'
       '${d.year} ${d.hour.toString().padLeft(2, '0')}:'
@@ -480,9 +530,11 @@ class _HistoryTab extends StatelessWidget {
                     Card(
                       color: Colors.white,
                       child: ListTile(
-                        leading: Text(s.language.flag, style: const TextStyle(fontSize: 28)),
+                        onTap: () => _correctWords(context, kid, s),
+                        leading: const Icon(Icons.edit_note, size: 30),
                         title: Text('${s.words} Wörter${s.isRecord ? '  🏆' : ''}'),
-                        subtitle: Text('${_fmt(s.createdAt)} · +${s.points} Punkte'),
+                        subtitle: Text('${_fmt(s.createdAt)} · +${s.points} Punkte · '
+                            'zum Korrigieren antippen'),
                         trailing: IconButton(
                           tooltip: 'Runde löschen (z. B. Fehlmessung)',
                           icon: const Icon(Icons.delete_outline),

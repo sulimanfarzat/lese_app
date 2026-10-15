@@ -192,6 +192,7 @@ class SessionResult {
     required this.previousBest,
     required this.newlyUnlocked,
     required this.pointsThreshold,
+    this.savedOnline = true,
   });
 
   final int words;
@@ -200,4 +201,5 @@ class SessionResult {
   final int previousBest;
   final List<Reward> newlyUnlocked;
   final int pointsThreshold;
+  final bool savedOnline; // false = lokal gespeichert, wird später hochgeladen
 }

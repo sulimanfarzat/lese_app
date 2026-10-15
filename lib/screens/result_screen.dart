@@ -107,7 +107,15 @@ class ResultScreen extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            Text(
+              result.savedOnline
+                  ? '☁️ Gespeichert'
+                  : '📶 Gespeichert auf dem Handy – wird hochgeladen, sobald Internet da ist',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
             SizedBox(
               height: 64,
               child: FilledButton(

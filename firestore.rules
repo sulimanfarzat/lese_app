@@ -37,12 +37,15 @@ service cloud.firestore {
       allow delete: if false;
 
       match /children/{childId} {
-        allow read, write: if isMember(code);
+        allow read, create, delete: if isMember(code);
+        // Ein Rekord kann nur steigen – nie verloren gehen.
+        allow update: if isMember(code)
+          && request.resource.data.get('bestWpm', 0) >= resource.data.get('bestWpm', 0);
 
         match /sessions/{sessionId} {
           allow read, delete: if isMember(code);
           // Plausibilitätsprüfung: max. 300 Wörter in einer Minute.
-          allow create: if isMember(code)
+          allow create, update: if isMember(code)
             && request.resource.data.words is int
             && request.resource.data.words >= 0
             && request.resource.data.words <= 300;

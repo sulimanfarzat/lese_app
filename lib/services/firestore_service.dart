@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -214,56 +215,112 @@ class FamilyService {
 
   // ---------------------------------------------------------- Lese-Runden
 
-  /// Speichert eine Runde und aktualisiert Punkte + Rekord in einer Transaktion.
+  /// Liest ein Dokument – vom Server, und wenn das nicht klappt (offline,
+  /// schlechtes Netz) aus dem Zwischenspeicher auf dem Handy.
+  Future<DocumentSnapshot<Map<String, dynamic>>> _getDoc(
+      DocumentReference<Map<String, dynamic>> ref) async {
+    try {
+      return await ref.get().timeout(const Duration(seconds: 6));
+    } catch (_) {
+      return ref.get(const GetOptions(source: Source.cache));
+    }
+  }
+
+  /// Speichert eine Runde und aktualisiert Punkte + Rekord.
+  ///
+  /// Bewusst OHNE Transaktion: Transaktionen scheitern bei schlechtem Netz.
+  /// Ein Batch wird dagegen sofort auf dem Handy gespeichert und automatisch
+  /// hochgeladen, sobald wieder Internet da ist – es geht nichts verloren.
   Future<SessionResult> saveSession({
     required String childId,
     required int words,
     required ReadingLanguage language,
   }) async {
-    final rewards = (await _rewards.get()).docs.map(Reward.fromDoc).toList();
-    final before = Child.fromDoc(await _childRef(childId).get());
-    final unlockedBefore =
-        rewards.where((r) => r.isUnlockedFor(before)).map((r) => r.id).toSet();
+    var rewards = <Reward>[];
+    try {
+      rewards = (await _rewards.get().timeout(const Duration(seconds: 6)))
+          .docs
+          .map(Reward.fromDoc)
+          .toList();
+    } catch (_) {/* ohne Geschenkliste trotzdem speichern */}
 
-    late bool isRecord;
-    late int points;
-    late int previousBest;
-    late int threshold;
+    final family = Family.fromDoc(await _getDoc(_famRef));
+    final before = Child.fromDoc(await _getDoc(_childRef(childId)));
 
-    await _db.runTransaction((tx) async {
-      final family = Family.fromDoc(await tx.get(_famRef));
-      final child = Child.fromDoc(await tx.get(_childRef(childId)));
-      previousBest = child.bestWpm;
-      isRecord = words > child.bestWpm && words > 0;
-      threshold = family.pointsThreshold;
-      points = family.pointsFor(words, isRecord: isRecord);
+    final isRecord = words > before.bestWpm && words > 0;
+    final points = family.pointsFor(words, isRecord: isRecord);
 
-      tx.set(_sessions(childId).doc(), {
-        'words': words,
-        'points': points,
-        'language': language.code,
-        'isRecord': isRecord,
-        'durationSeconds': 60,
-        'device': uid,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      tx.update(_childRef(childId), {
-        'pointsTotal': FieldValue.increment(points),
-        if (isRecord) 'bestWpm': words,
-      });
+    final batch = _db.batch();
+    batch.set(_sessions(childId).doc(), {
+      'words': words,
+      'points': points,
+      'language': language.code,
+      'isRecord': isRecord,
+      'durationSeconds': 60,
+      'device': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    batch.update(_childRef(childId), {
+      'pointsTotal': FieldValue.increment(points),
+      if (isRecord) 'bestWpm': words,
     });
 
-    final after = Child.fromDoc(await _childRef(childId).get());
+    var savedOnline = true;
+    try {
+      await batch.commit().timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      // Kein Netz: Firestore hat die Runde lokal gespeichert und lädt sie
+      // automatisch hoch, sobald das Handy wieder online ist.
+      savedOnline = false;
+    }
+
+    final after = Child(
+      id: before.id,
+      name: before.name,
+      emoji: before.emoji,
+      pointsTotal: before.pointsTotal + points,
+      pointsSpent: before.pointsSpent,
+      bestWpm: isRecord ? words : before.bestWpm,
+      language: before.language,
+      redeemed: before.redeemed,
+    );
     return SessionResult(
       words: words,
       points: points,
       isNewRecord: isRecord,
-      previousBest: previousBest,
+      previousBest: before.bestWpm,
       newlyUnlocked: rewards
-          .where((r) => r.isUnlockedFor(after) && !unlockedBefore.contains(r.id))
+          .where((r) => r.isUnlockedFor(after) && !r.isUnlockedFor(before))
           .toList(),
-      pointsThreshold: threshold,
+      pointsThreshold: family.pointsThreshold,
+      savedOnline: savedOnline,
     );
+  }
+
+  /// Eltern korrigieren die Wortzahl einer Runde (z. B. wenn die
+  /// Spracherkennung zu wenig gezählt hat). Punkte werden neu berechnet,
+  /// ein höherer Wert kann auch einen neuen Rekord ergeben.
+  /// Ein Rekord wird dabei nie verringert.
+  Future<void> correctSessionWords(
+      String childId, ReadingSession s, int newWords) async {
+    final family = Family.fromDoc(await _getDoc(_famRef));
+    final child = Child.fromDoc(await _getDoc(_childRef(childId)));
+    final beatsRecord = newWords > child.bestWpm;
+    final isRecord = s.isRecord || beatsRecord;
+    final newPoints = family.pointsFor(newWords, isRecord: isRecord);
+
+    final batch = _db.batch();
+    batch.update(_sessions(childId).doc(s.id), {
+      'words': newWords,
+      'points': newPoints,
+      'isRecord': isRecord,
+      'correctedFrom': s.words,
+    });
+    batch.update(_childRef(childId), {
+      'pointsTotal': FieldValue.increment(newPoints - s.points),
+      if (beatsRecord) 'bestWpm': newWords,
+    });
+    await batch.commit();
   }
 
   Stream<List<ReadingSession>> watchSessions(String childId, {int limit = 50}) =>

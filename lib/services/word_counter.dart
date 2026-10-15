@@ -6,34 +6,29 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../models/models.dart';
+import 'word_tally.dart';
 
 /// Hört über das Mikrofon zu und zählt erkannte Wörter.
 ///
-/// Android beendet die Spracherkennung nach Pausen oder Fehlern von selbst.
-/// Darum:
-///  * ein **Wächter** prüft jede halbe Sekunde, ob noch zugehört wird, und
-///    startet die Erkennung sofort neu, falls nicht,
-///  * jeder Abschnitt bekommt eine Nummer, damit verspätete Ergebnisse eines
-///    alten Abschnitts nicht doppelt gezählt werden.
+///  * Ein **Wächter** prüft jede halbe Sekunde, ob noch zugehört wird, und
+///    startet die Erkennung sofort neu, falls Android sie beendet hat.
+///  * Die eigentliche Zählung macht [WordTally]: Sie erkennt, wenn die
+///    Erkennung intern einen neuen Satz beginnt, und verliert dabei keine
+///    Wörter. Die angezeigte Zahl wird nie kleiner.
 class WordCounter extends ChangeNotifier {
   final SpeechToText _speech = SpeechToText();
+  final WordTally _tally = WordTally();
 
   bool _available = false;
   bool _running = false;
   bool _starting = false;
   String? _localeId;
-
-  int _segment = 0; // Nummer des aktuellen Abschnitts
-  int _committedWords = 0; // Wörter aus abgeschlossenen Abschnitten
-  int _currentWords = 0; // Wörter im laufenden Abschnitt
-  String _committedText = '';
-  String _currentText = '';
   DateTime _lastStart = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _watchdog;
   String? lastError;
 
-  int get wordCount => _committedWords + _currentWords;
-  String get lastText => '$_committedText $_currentText'.trim();
+  int get wordCount => _tally.total;
+  String get lastText => _tally.text;
   bool get isListening => _speech.isListening;
 
   /// Gibt eine Fehlermeldung zurück oder null, wenn alles bereit ist.
@@ -64,10 +59,7 @@ class WordCounter extends ChangeNotifier {
   }
 
   Future<void> start() async {
-    _committedWords = 0;
-    _currentWords = 0;
-    _committedText = '';
-    _currentText = '';
+    _tally.reset();
     lastError = null;
     _running = true;
     notifyListeners();
@@ -82,9 +74,11 @@ class WordCounter extends ChangeNotifier {
     _watchdog?.cancel();
     _watchdog = null;
     await _speech.stop();
-    _closeSegment();
+    // Kurz auf das letzte Ergebnis warten, dann abschließen.
+    await Future.delayed(const Duration(milliseconds: 400));
+    _tally.closeSegment();
     notifyListeners();
-    return wordCount;
+    return _tally.total;
   }
 
   /// Wächter: läuft die Runde, hört aber niemand zu → neu starten.
@@ -95,7 +89,7 @@ class WordCounter extends ChangeNotifier {
         const Duration(milliseconds: 700)) {
       return;
     }
-    _closeSegment();
+    _tally.closeSegment();
     _listen();
   }
 
@@ -103,7 +97,7 @@ class WordCounter extends ChangeNotifier {
     if (!_running || !_available || _starting) return;
     _starting = true;
     _lastStart = DateTime.now();
-    final segment = ++_segment;
+    final segment = _tally.segment;
     try {
       if (_speech.isListening) await _speech.cancel();
       await _speech.listen(
@@ -125,29 +119,16 @@ class WordCounter extends ChangeNotifier {
   }
 
   void _onResult(SpeechRecognitionResult result, int segment) {
-    // Verspätetes Ergebnis eines schon abgeschlossenen Abschnitts → ignorieren.
-    if (segment != _segment) return;
-    _currentWords = countWords(result.recognizedWords);
-    _currentText = result.recognizedWords;
-    if (result.finalResult) _closeSegment();
+    _tally.addResult(result.recognizedWords,
+        isFinal: result.finalResult, segment: segment);
     notifyListeners();
   }
 
-  /// Übernimmt den laufenden Abschnitt in die Summe (genau einmal).
-  void _closeSegment() {
-    if (_currentWords > 0) {
-      _committedWords += _currentWords;
-      _committedText = '$_committedText $_currentText'.trim();
-    }
-    _currentWords = 0;
-    _currentText = '';
-    _segment++; // alles, was jetzt noch vom alten Abschnitt kommt, zählt nicht
-  }
-
   void _onStatus(String status) {
-    if (status == SpeechToText.doneStatus ||
-        status == SpeechToText.notListeningStatus) {
-      if (_running) _closeSegment();
+    if ((status == SpeechToText.doneStatus ||
+            status == SpeechToText.notListeningStatus) &&
+        _running) {
+      _tally.closeSegment();
     }
     notifyListeners();
   }
@@ -155,19 +136,12 @@ class WordCounter extends ChangeNotifier {
   void _onError(SpeechRecognitionError error) {
     // Bei Lesepausen kommen "error_no_match"/"error_speech_timeout" – normal.
     lastError = error.errorMsg;
-    if (_running) _closeSegment();
+    if (_running) _tally.closeSegment();
     notifyListeners();
   }
 
   /// Zählt Wörter in einem Text (Satzzeichen werden ignoriert).
-  static int countWords(String text) {
-    final cleaned =
-        text.replaceAll(RegExp(r'[.,!?;:"()\[\]{}«»„“”…\-–—]'), ' ');
-    return cleaned
-        .split(RegExp(r'\s+'))
-        .where((w) => w.trim().isNotEmpty)
-        .length;
-  }
+  static int countWords(String text) => WordTally.splitWords(text).length;
 
   @override
   void dispose() {
