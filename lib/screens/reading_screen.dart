@@ -128,7 +128,7 @@ class _ReadingScreenState extends State<ReadingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rtl = widget.language == ReadingLanguage.arabic;
+    const rtl = false;
     return PopScope(
       canPop: _phase != _Phase.reading && _phase != _Phase.saving,
       child: Scaffold(

@@ -1,9 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Sprache, in der das Kind liest.
+/// Sprache, in der das Kind liest (derzeit nur Deutsch).
 enum ReadingLanguage {
-  german('de', 'Deutsch', '🇩🇪'),
-  arabic('ar', 'العربية', '🇸🇾');
+  german('de', 'Deutsch', '🇩🇪');
 
   const ReadingLanguage(this.code, this.label, this.flag);
   final String code;

@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
 
@@ -31,9 +32,53 @@ class DeviceService {
   DocumentReference<Map<String, dynamic>> get _deviceRef =>
       _db.collection('devices').doc(uid);
 
+  static const _prefKey = 'familyCode';
+
   Future<String?> currentFamilyCode() async {
     final snap = await _deviceRef.get();
     return snap.data()?['familyCode'] as String?;
+  }
+
+  /// Familien-Code zusätzlich direkt auf dem Handy speichern.
+  static Future<void> _remember(String? code) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (code == null) {
+      await prefs.remove(_prefKey);
+    } else {
+      await prefs.setString(_prefKey, code);
+    }
+  }
+
+  /// Ermittelt die Familie dieses Handys, ohne erneut nach dem Code zu fragen:
+  ///  1. Eintrag in Firestore (devices/{uid})
+  ///  2. sonst der auf dem Handy gespeicherte Code → still wieder beitreten
+  ///     (falls das Handy inzwischen eine neue Anmelde-ID bekommen hat)
+  Future<String?> resolveFamilyCode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final local = prefs.getString(_prefKey);
+
+    String? remote;
+    try {
+      remote = await currentFamilyCode();
+    } catch (_) {
+      if (local != null) return local; // offline → gespeicherten Code nutzen
+      rethrow;
+    }
+
+    if (remote != null) {
+      if (remote != local) await prefs.setString(_prefKey, remote);
+      return remote;
+    }
+    if (local != null) {
+      try {
+        final err = await joinFamily(local);
+        if (err == null) return local;
+        await prefs.remove(_prefKey); // Familie gibt es nicht mehr
+      } catch (_) {
+        return local;
+      }
+    }
+    return null;
   }
 
   /// Gut lesbarer Code ohne 0/O/1/I/L: 6 Zeichen ≈ 887 Mio. Möglichkeiten.
@@ -65,6 +110,7 @@ class DeviceService {
     });
     await famRef.collection('children').add(_newChild(firstChildName, '🦎'));
     await _deviceRef.set({'familyCode': code, 'joinedAt': FieldValue.serverTimestamp()});
+    await _remember(code);
     return code;
   }
 
@@ -79,6 +125,7 @@ class DeviceService {
       'members': FieldValue.arrayUnion([uid]),
     });
     await _deviceRef.set({'familyCode': code, 'joinedAt': FieldValue.serverTimestamp()});
+    await _remember(code);
     return null;
   }
 
@@ -88,6 +135,7 @@ class DeviceService {
       'members': FieldValue.arrayRemove([uid]),
     });
     await _deviceRef.delete();
+    await _remember(null);
   }
 }
 

@@ -28,8 +28,15 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<(String, String?)> _load() async {
     final auth = FirebaseAuth.instance;
-    final user = auth.currentUser ?? (await auth.signInAnonymously()).user!;
-    final code = await DeviceService(user.uid).currentFamilyCode();
+    // Warten, bis Firebase die gespeicherte Anmeldung wiederhergestellt hat –
+    // sonst würde jedes Mal ein neues (anonymes) Konto angelegt.
+    User? user = auth.currentUser ??
+        await auth
+            .authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+    user ??= (await auth.signInAnonymously()).user!;
+    final code = await DeviceService(user.uid).resolveFamilyCode();
     return (user.uid, code);
   }
 

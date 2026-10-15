@@ -55,7 +55,7 @@ class WordCounter extends ChangeNotifier {
           'nicht installiert. Bitte in den Android-Einstellungen unter '
           '„Google → Spracheingabe → Sprachen“ hinzufügen.';
     }
-    const preferred = ['de_DE', 'de-DE', 'ar_SY', 'ar-SY', 'ar_SA', 'ar-SA'];
+    const preferred = ['de_DE', 'de-DE'];
     _localeId = match
         .firstWhere((l) => preferred.contains(l.localeId),
             orElse: () => match.first)
@@ -159,10 +159,10 @@ class WordCounter extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Zählt Wörter in deutschem oder arabischem Text.
+  /// Zählt Wörter in einem Text (Satzzeichen werden ignoriert).
   static int countWords(String text) {
     final cleaned =
-        text.replaceAll(RegExp(r'[.,!?;:"()\[\]{}«»„“”…\-–—،؛؟]'), ' ');
+        text.replaceAll(RegExp(r'[.,!?;:"()\[\]{}«»„“”…\-–—]'), ' ');
     return cleaned
         .split(RegExp(r'\s+'))
         .where((w) => w.trim().isNotEmpty)

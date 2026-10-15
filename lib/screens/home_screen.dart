@@ -155,18 +155,6 @@ class _ChildHome extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 20),
-        const Text('In welcher Sprache liest du?',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
-        SegmentedButton<ReadingLanguage>(
-          segments: [
-            for (final l in ReadingLanguage.values)
-              ButtonSegment(value: l, label: Text('${l.flag} ${l.label}')),
-          ],
-          selected: {child.language},
-          onSelectionChanged: (s) => service.setLanguage(child.id, s.first),
-        ),
         const SizedBox(height: 24),
         SizedBox(
           height: 120,
